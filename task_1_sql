@@ -1,0 +1,76 @@
+1.Актуальное состояние товаров на 2020-06-01
+SELECT items.item_id,
+       items.name,
+       items.price,
+       items.update_date
+FROM items
+JOIN (
+    SELECT item_id,
+           MAX(update_date) AS last_update
+    FROM items
+    WHERE update_date <= '2020-06-01'
+    GROUP BY item_id
+) latest ON items.item_id = latest.item_id
+         AND items.update_date = latest.last_update;
+
+2.Товары, купленные по цене больше или равной 3
+SELECT orders.order_id,
+       orders.user_id,
+       orders.item_id,
+       orders.order_date,
+       items.name,
+       items.price
+FROM orders
+JOIN items
+  ON items.item_id = orders.item_id
+WHERE items.update_date = (
+    SELECT MAX(items_sub.update_date)
+    FROM items items_sub
+    WHERE items_sub.item_id = orders.item_id
+      AND items_sub.update_date <= orders.order_date
+)
+  AND items.price >= 3;
+
+3.Сумма покупок клиента 1
+SELECT orders.user_id,
+       SUM(items.price) AS total_purchase
+FROM orders
+JOIN items
+  ON items.item_id = orders.item_id
+WHERE orders.user_id = 1
+  AND items.update_date = (
+      SELECT MAX(items_sub.update_date)
+      FROM items items_sub
+      WHERE items_sub.item_id = orders.item_id
+        AND items_sub.update_date <= orders.order_date
+  )
+GROUP BY orders.user_id;
+
+4.Сумма всех покупок до 2020-05-01 включительно
+SELECT SUM(items.price) AS total_purchase
+FROM orders
+JOIN items
+  ON items.item_id = orders.item_id
+WHERE orders.order_date <= '2020-05-01'
+  AND items.update_date = (
+      SELECT MAX(items_sub.update_date)
+      FROM items items_sub
+      WHERE items_sub.item_id = orders.item_id
+        AND items_sub.update_date <= orders.order_date
+  );
+
+5.Сумма всех заказов и средняя цена заказа поквартально
+SELECT DATE_PART('year', orders.order_date) AS order_year,
+       DATE_PART('quarter', orders.order_date) AS order_quarter,
+       SUM(items.price) AS total_sales,
+       AVG(items.price) AS average_order_price
+FROM orders
+JOIN items
+  ON items.item_id = orders.item_id
+WHERE items.update_date = (
+    SELECT MAX(items_sub.update_date)
+    FROM items items_sub
+    WHERE items_sub.item_id = orders.item_id
+      AND items_sub.update_date <= orders.order_date
+)
+GROUP BY DATE_PART('year', orders.order_date), DATE_PART('quarter', orders.order_date);
